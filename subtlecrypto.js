@@ -46,20 +46,6 @@ var mrsubtle = {
 }
 */
 
-function encryptStringWithPassphrase(plaintext_string, passphrase) {
-  // first.. I'm waiting
-  console.log("Waiting for encryption");
-  // First generate a salt
-  var iv = getSalt();
-  // First get the key material
-  getKeyMaterialFromPassphrase(passphrase)
-    .then(value => {
-      // Encrypt it
-      return encryptString(value, iv, plaintext_string);
-    }).then(value => {
-          console.log("encrypted result:" + value);
-    });
-}
 
 function encryptStringWithPassphrase2(plaintext_string, passphrase) {
   // first.. I'm waiting
@@ -88,27 +74,6 @@ function decryptStringWithPassphrase2(ciphertext_string, passphrase) {
     });
 }
 
-function decryptStringWithPassphrase(ct_string, passphrase) {
-  // first.. I'm waiting
-  console.log("Waiting for decryption");
-  // Expects iv&ct
-  // Split the iv from the ct
-  var iv_b64 = ct_string.split('&')[0];
-  var ct_b64 = ct_string.split('&')[1];
-  // First get the key material
-  getKeyMaterialFromPassphrase(passphrase)
-    .then(value => {
-      // Encrypt it
-      return decryptString(value, iv_b64, ct_b64);
-    }).then(value => {
-          console.log("decrypted result:" + value);
-    }).catch(err => {
-      console.log("couldn't decrypt. bad password?");
-      console.log(err.name);
-      console.log(err.message);
-      throw(err);
-    });
-}
 
 async function getKeyMaterialFromPassphrase(passphrase) {
   // Passphrase is string
@@ -144,57 +109,6 @@ function base64StringToUInt8Arr(base64_string) {
   return response;
 }
 
-async function encryptDataWithPassphrase(data, passphrase) {
-  // first.. I'm waiting
-  console.log("Waiting for encryption");
-  // First generate a salt
-  var iv = getSalt();
-  // First get the key material
-  getKeyMaterialFromPassphrase(passphrase)
-    .then(value => {
-      // Encrypt it
-      return encryptData(value, iv, data);
-    }).then(value => {
-      encryptedData =
-          console.log("encrypted result:" + value);
-    });
-}
-
-async function encryptString(key, iv_base64, plaintext_string) {
-  // key should be CryptKey from subtle (use getKeyMaterialFromPassword)
-  // iv is base64 encoded string
-  // plaintext_string is straightup string
-  // returns a base64 string of the iv&ciphertext
-
-  // Convert IV
-  var iv = base64StringToUInt8Arr(iv_base64);
-
-  // Convert plaintext to buffer
-  var pt = new TextEncoder().encode(plaintext_string);
-
-  var ct = await encryptData(key, iv, pt);
-
-  return iv_base64+'&'+btoa(ct);
-}
-
-
-async function decryptString(key, iv_base64, ciphertext_string) {
-  // key should be CryptKey from subtle (use getKeyMaterialFromPassword)
-  // iv is base64 encoded string
-  // ciphertext_string is base64 encoded ciphertext
-  // returns a pt string
-  // Convert IV
-  var iv = base64StringToUInt8Arr(iv_base64);
-
-  // Convert ciphertext_string to buffer
-  var ct = base64StringToUInt8Arr(ciphertext_string);
-
-  var pt = await decryptData(key, iv, ct);
-  var pt_arr = new Uint8Array(pt);
-  var pt_string = new TextDecoder().decode(pt);
-
-  return pt_string;
-}
 
 async function ezSubtleEncrypt(data, key) {
   // data can be a flat string or array of data
@@ -290,30 +204,6 @@ async function decryptData2(key, iv, ciphertext) {
   return new Uint8Array(pt);
 }
 
-
-async function encryptData(key, iv, plaintext) {
-  var ct = await window.crypto.subtle.encrypt(
-    {
-      name: "AES-GCM",
-      iv: iv
-    },
-    key,
-    plaintext
-  );
-  // Returns array buffer, have to convert to array
-  return new Uint8Array(ct);
-}
-
-async function decryptData(key, iv, ciphertext) {
-  return window.crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: iv
-    },
-    key,
-    ciphertext
-  );
-}
 
 function getSalt() {
   // Returns a Uint8Array salt
