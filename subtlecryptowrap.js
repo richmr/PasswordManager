@@ -1,50 +1,8 @@
 /*
-Get some key material to use as input to the deriveKey method.
-The key material is a password supplied by the user.
-*/
-/*
-Need to test:
-- Generate a random key
-- encrypt something with it
-- Export it
-- encrypt it with a passphrase
-- decrypt it with a passphrase
-- import it
-- decrypt the thing
+Wrappers for crypto.Subtle
+Mike Rich, 2019
 */
 
-// Why is javascript so obsessed with globals
-// Making a collection to help with namespace issues
-/*
-var mrsubtle = {
-  // This is the actual crypto key
-  masterKey: null,
-
-  generateNewKey: function () {
-    crypto.subtle.generateKey({name:"AES-GCM", length:256}, true, ["encrypt=
-", "decrypt"])
-      .then(key => {
-        this.masterKey=key;
-        console.log("New key received");
-      });
-  }
-
-  encryptMasterKey: function (passphrase) {
-
-  }
-
-  fun1: function() {
-    console.log("fun 1 called"+this.masterKey);
-  },
-
-  fun2: function() {
-    this.masterKey = "MASTER";
-    console.log("fun 2 called:"+this.masterKey);
-    this.masterKey = "SLAVE!"
-    this.fun1();
-  }
-}
-*/
 
 ////  Utility support functions ////
 
