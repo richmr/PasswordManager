@@ -69,10 +69,74 @@ function pmenginetest2() {
     })
 }
 
+function makefakedata() {
+  //  Need some data to play with
+  pmengine.fakeVals();
+  siteData = [];
+  for (i = 1; i <=4 ; i++) {
+    thisSite = {Index: i, Site: "site"+i, Username: "siteID"+i,
+      Password: "password"+i, AdditionalInfo: "Notes"+i};
+    siteData.push(thisSite);
+  }
+  console.log(JSON.stringify(siteData));
+  $.each(siteData, function(index, aSite) {
+    // encrypt the stuffs
+    pmengine.recoverMasterKeyFromLocalStorage()
+      .then(foo => {
+        toencrypt = ["Site", "Username", "Password", "AdditionalInfo"];
+        encrypters = [];
+        $.each(toencrypt, function(subindex, element) {
+          var dothisone = pmengine.encryptSecretWithMasterKey(aSite[element])
+            .then(ct => {
+              siteData[index][element] = ct;
+            });
+          encrypters.push(dothisone);
+        });
+        return Promise.all(encrypters);
+      }).then(foo => {
+        console.log("Site "+index+" Encryption complete");
+        console.log(JSON.stringify(siteData));
+      });
+  });
+  console.log("Site data encrypted?");
+}
+
+function makefakedata2() {
+  //  Need some data to play with
+  siteData = [];
+  sitenames = ["google", "apple", "la dwp", "goatherd"]
+  for (i = 1; i <=4 ; i++) {
+    sitename = sitenames[i-1];
+    thisSite = {Index: i, Site: sitename, Username: sitename+"username",
+      Password: sitename+"password", AdditionalInfo: sitename+"notes"};
+    siteData.push(thisSite);
+  }
+  pmengine.fakeVals();
+  pmengine.recoverMasterKeyFromLocalStorage()
+    .then(foo => {
+      encrypters = [];
+      $.each(siteData, function(index, aSite) {
+      toencrypt = ["Username", "Password", "AdditionalInfo"];
+        $.each(toencrypt, function(subindex, element) {
+          var dothisone = pmengine.encryptSecretWithMasterKey(aSite[element])
+            .then(ct => {
+              siteData[index][element] = ct;
+            });
+          encrypters.push(dothisone);
+        });
+      });
+      return Promise.all(encrypters);
+    }).then(foo => {
+      console.log("Encryption complete?");
+      console.log(JSON.stringify(siteData));
+    });
+}
+
 $(document).ready(function(){
   M.AutoInit();
-  $("#begin_test_btn").click(function (event) {
-    pmenginetest2();
-  });
+  
+  pmengine.fakeVals()
+  pmui.fakeVals();
+  pmui.init();
 
 });

@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Cryto Tests</title>
-
+  <title>GAS Password Manager</title>
+  <!--Import Google Icon Font-->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-
-
   <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <script
 	  src="https://code.jquery.com/jquery-3.4.1.min.js"
@@ -15,17 +14,116 @@
 		<script
 	  src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
 	  integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
-	  crossorigin="anonymous"></script>
+	  crossorigin="anonymous">
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <style>
+  #toast-container {
+    top: auto !important;
+    right: auto !important;
+    bottom: 75%;
+    left: 65%;
+  }
+  </style>
 </head>
 
 <body>
-    This is literally for console testing at the moment
-    <div id="status">Status goes here</div><br>
-    <a id="begin_test_btn" class="waves-effect waves-light btn">Begin Test</a>
+  <div id="pm_main" class="row">
+    <div id="pm_startup" >
+      <div class="col s12">
+        <h4 class="center-align">Starting GAS PM</h4>
+      </div>
+      <div class="col s12">
+        <div id="pm_startup_message" class="center-align">
+          Unlocking master key
+        </div>
+      </div>
+      <div class="col s12">
+        <div id="pm_startup_progress" class="progress">
+          <div id="pm_startup_progress_bar" class="determinate" style="width: 5%"></div>
+        </div>
+      </div>
+    </div>  <!-- PM Startup -->
+
+    <div id="pm_findaccount" hidden>
+      <div class="col s12">
+        <h4 class="center-align">Look up account:</h4>
+      </div>
+      <div class="col s12">
+        <div class="center-align">(Or create a new one)</div>
+      </div>
+      <div class="col s12">
+        <div class="input-field col s9">
+          <input type="text" id="pm_findaccount_autocomplete" class="autocomplete">
+          <label for="pm_findaccount_autocomplete">Account Name</label>
+        </div>
+        <div class="col s3">
+          <a id="pm_findaccount_openbtn" class="waves-effect waves-light btn">Go!</a>
+        </div>
+      </div>
+    </div> <!-- PM find account -->
+
+    <div id="pm_editaccount" hidden>
+      <div class="input-field col s12">
+        <div id="pm_editaccount_accountID" hidden>1</div>
+        <input placeholder="Account Name" id="pm_editaccount_name" type="text" class="validate">
+        <label for="pm_editaccount_name">Account Name</label>
+      </div>
+      <div class="input-field col s12">
+        <input placeholder="Username" id="pm_editaccount_username" type="text" class="validate">
+        <label for="pm_editaccount_username">Username</label>
+      </div>
+      <div class="input-field col s12">
+        <input placeholder="Password" id="pm_editaccount_password" type="password" class="validate">
+        <label for="pm_editaccount_password">Password</label>
+      </div>
+      <div class="col s3">View password</div>
+      <div class="col s3">
+        <div class="switch">
+          <label>
+            Off
+            <input id="pm_editaccount_password_view" type="checkbox">
+            <span class="lever"></span>
+            On
+          </label>
+        </div>
+      </div>
+      <div class="col s6">
+        <a id="pm_editaccount_password_copy" class="waves-effect waves-light btn disabled">Copy to clipboard</a>
+      </div>
+      <input id="password_buffer" type="text" hidden>
+      <div class="input-field col s12">
+        <textarea id="pm_editaccount_additional_notes" class="materialize-textarea"></textarea>
+        <label for="pm_editaccount_additional_notes" class="active" >Additional notes</label>
+      </div>
+      <div class="col s4">
+        <a id="pm_editaccount_delete" class="wave-effect waves-light red btn">Delete</a>
+      </div>
+      <div class="col s4">
+        <a id="pm_editaccount_save" class="wave-effect waves-light green btn disabled">Save Changes</a>
+      </div>
+      <div class="col s4">
+        <a id="pm_editaccount_cancel" class="wave-effect waves-light btn">Done</a>
+      </div>
+    </div>
+      <div id="pm_editaccount_confirmcancel" class="col s12" hidden>
+        <h4 id="pm_editaccount_confirmcancel_header" class="center-align">Confirm Changes?</h4>
+        <div id="pm_editaccount_confirm" class="col s6 center-align" >
+          <a id="pm_editaccount_confirm_btn" class="wave-effect waves-light red btn">Confirm</a>
+        </div>
+        <div id="pm_editaccount_confirm" class="col s6 center-align" >
+          <a id="pm_editaccount_confirm_cancel_btn" class="wave-effect waves-light btn">Cancel</a>
+        </div>
+      </div>
+
+
 
     <!-- SCRIPTS -->
-    <script src="https://raw.githubusercontent.com/richmr/PasswordManager/master/subtlecryptowrap.js" crossorigin="anonymous"></script>
-    <script src="https://raw.githubusercontent.com/richmr/PasswordManager/master/PasswordManageEngine.js" crossorigin="anonymous"></script>
-    <script src="https://raw.githubusercontent.com/richmr/PasswordManager/master/cryptotests.js" crossorigin="anonymous"></script>
+    <script src="subtlecryptowrap.js" crossorigin="anonymous"></script>
+    <script src="PasswordManageEngine.js" crossorigin="anonymous"></script>
+    <script src="pmui.js" crossorigin="anonymous"></script>
+    <script src="cryptotests.js" crossorigin="anonymous"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 </body>

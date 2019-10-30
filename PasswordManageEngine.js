@@ -103,16 +103,21 @@ var pmengine = {
       });
   },
 
-  decryptSecretWithMasterKey: function(ciphertext) {
+  decryptSecretWithMasterKey: function(ciphertext, readable=false) {
     // secret is the "ez" subtle string to be decrypted
     // callback must accept the decrypted secret in Uint8Array form
+    // if readable == true, then returns a readable string
     if (this.masterKey == null) {
       this.whoops("decryptSecretWithMasterKey: Cannot decrypt!  Get masterKey first.");
     }
 
     return ezSubtleDecrypt(ciphertext, this.masterKey)
       .then(plaintext => {
-        return plaintext;
+        if (readable) {
+          return new TextDecoder().decode(plaintext);
+        } else {
+          return plaintext;
+        }
         //callback(plaintext);
       }).catch(err => {
         this.whoops("decryptSecretWithMasterKey:" +err.name+ " " +err.message, err);
