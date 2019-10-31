@@ -7,18 +7,42 @@ var pmui = {
   accountData: null,  // The accountData object, array of JSON objects
   accountNames: {},
   siteToEdit: 0,
+  nextIndex: 0,
 
-  init: function () {
+  /*
+  The callbacks below are used to get, save, and delete accounts
+  get is to return an array of accountObjects.
+  AccountObj = {Index: integer,
+                Site: cleartext string site name,
+                Username: ciphertext string user name,
+                Password: ciphertext string password,
+                AdditionalInfo: ciphertext string additional information}
+  saveAccounts must accept an array of accountObjects
+  deleteAccount must accept an integer index of account to delete
+  */
+  getAccountsFunc: null, // callback pmui will use to get account data. f()
+  saveAccountsFunc: null, // callback to save accounts. f(accountObjArray)
+  deleteAccountFunc: null, // callback to delete an account f(accountIndex)
+
+  init: function (getAccountsFunc, saveAccountsFunc, deleteAccountFunc) {
     pmui.initButtons();
+
+    pmui.getAccountsFunc = getAccountsFunc;
+    pmui.saveAccountsFunc = saveAccountsFunc;
+    pmui.deleteAccountFunc = deleteAccountFunc;
+
+    pmui.accountData = pmui.getAccountsFunc();
 
     // First unlock the masterKey
     this.accountNames = {};
+    indexNumbers = [];
     pmengine.recoverMasterKeyFromLocalStorage()
       .then(foo => {
         // set up the search bar
         $("#pm_startup_message").text("Processing accounts");
         $.each(this.accountData, function (index, anAccount) {
           pmui.accountNames[anAccount["Site"]] = null; // Per MaterializeCSS needs
+          indexNumbers.push(anAccount["Index"]);
           // Update the status bar
           percDone = ((index+1)/pmui.accountData.length)*100;
           $("#pm_startup_progress_bar").attr("width", percDone+"%");
@@ -27,7 +51,9 @@ var pmui = {
           data:pmui.accountNames,
           onAutocomplete:pmui.accountAutocompleted
         });
-        
+        // Set nextIndex
+        pmui.nextIndex = Math.max(...indexNumbers) + 1;
+
       }).then(foo => {
         // initial value for the "Find" button
         $("#pm_findaccount_openbtn").text("Go");
@@ -49,12 +75,12 @@ var pmui = {
     // Init password clipboard copy
     $("#pm_editaccount_password_copy").click(pmui.copyPasswordToClipboard);
 
-    //$("#pm_editaccount_save").click(pmui.saveChanges);
-    //$("#pm_editaccount_delete").click(pmui.deleteAccount);
-    //$("#pm_editaccount_cancel").click(pmui.doneEdit);
+    $("#pm_editaccount_save").click(pmui.saveChanges);
+    $("#pm_editaccount_delete").click(pmui.deleteAccount);
+    $("#pm_editaccount_cancel").click(pmui.doneEdit);
 
-    //$("#pm_editaccount_confirm_btn").click(pmui.confirmSaveChanges);
-    //$("#pm_editaccount_confirm_cancel_btn").click(pmui.cancelSave);
+    $("#pm_editaccount_confirm_btn").click(pmui.confirmSaveChanges);
+    $("#pm_editaccount_confirm_cancel_btn").click(pmui.cancelSave);
   },
 
   /// ---------------- edit account methods ------------ //
@@ -63,6 +89,12 @@ var pmui = {
   },
 
   editAccount: function () {
+    // Ensure the entry boxes are clear
+    $("#pm_editaccount_name").val("");
+    $("#pm_editaccount_username").val("");
+    $("#pm_editaccount_password").val("");
+    $("#pm_editaccount_additional_notes").val("");
+
     // Find the record with the name
     var nameOfSite = $("#pm_findaccount_autocomplete").val();
     $("#pm_editaccount_password_copy").removeClass("disabled");
@@ -81,6 +113,9 @@ var pmui = {
       $("#pm_editaccount_save").removeClass("disabled");
       // Rename "Done" to "Cancel"
       $("#pm_editaccount_cancel").text("Cancel");
+
+      // Clear the autocomplete
+      $("#pm_findaccount_autocomplete").val("");
 
       // switch views
       $("#pm_findaccount").hide();
@@ -113,12 +148,17 @@ var pmui = {
           $("#pm_editaccount_delete").removeClass("disabled");
           // Activate the save button
           $("#pm_editaccount_save").removeClass("disabled");
+          $("#pm_editaccount_save").text("Save");
+
           // Rename "Done" to "Cancel"
           $("#pm_editaccount_cancel").text("Done");
 
           // switch views
           $("#pm_findaccount").hide();
           $("#pm_editaccount").show();
+
+          // Clear the autocomplete
+          $("#pm_findaccount_autocomplete").val("");
         });
 
     }
@@ -149,6 +189,126 @@ var pmui = {
     }
     M.toast({html: "Copied!"})
   },
+
+  /// ----------------- Save and confirm methods ------- //
+  saveChanges: function () {
+    // Show the confirm/cancel buttons
+    // Set the text
+    $("#pm_editaccount_confirmcancel_header").text("Confirm Changes?");
+    $("#pm_editaccount_confirm_btn").text("Confirm");
+    $("#pm_editaccount_confirm_cancel_btn").text("Cancel");
+
+    // Show the div
+    $("#pm_editaccount_confirmcancel").show();
+  },
+
+  deleteAccount: function () {
+    // Show the confirm/cancel buttons
+    // Set the text
+    $("#pm_editaccount_confirmcancel_header").text("Delete Account?");
+    $("#pm_editaccount_confirm_btn").text("Delete");
+    $("#pm_editaccount_confirm_cancel_btn").text("Cancel");
+
+    // Show the div
+    $("#pm_editaccount_confirmcancel").show();
+  },
+
+  doneEdit: function () {
+    // simply hide the edit div and show the search
+    // switch views
+    $("#pm_editaccount").hide();
+    $("#pm_findaccount").show();
+  },
+
+  confirmSaveChanges: function () {
+    // Are we deleting or saving?
+    if ($("#pm_editaccount_confirm_btn").text() == "Delete") {
+      // We are deleting
+      // Remove from the database
+      pmui.deleteAccountFunc(pmui.siteToEdit);
+
+      // Remove from account data
+      // From name list first
+      delete pmui.accountNames[$("#pm_editaccount_name").val()];
+      pmui.accountData.splice(pmui.siteToEdit,1);
+
+      // Feedback
+      M.toast({html: "Deleted!"});
+
+      // switch views
+      $("#pm_editaccount_confirmcancel").hide();
+      $("#pm_editaccount").hide();
+      $("#pm_findaccount").show();
+
+    } else {
+      // We are saving
+      // Create a new accountObj
+      accData = {};
+      // Is this a new account?
+      if (pmui.siteToEdit == -1) {
+        accData["Index"] = pmui.nextIndex;
+        pmui.nextIndex++;
+      } else {
+        // Copy old index
+        accData["Index"] = pmui.accountData[pmui.siteToEdit]["Index"];
+      }
+      // Get the PT for now
+      accData["Site"] = $("#pm_editaccount_name").val();
+      accData["Username"] = $("#pm_editaccount_username").val();
+      accData["Password"] = $("#pm_editaccount_password").val();
+      accData["AdditionalInfo"] = $("#pm_editaccount_additional_notes").val();
+
+      // Encrypt all the things
+      encryptPromises = [];
+      encryptPromises.push(pmengine.encryptSecretWithMasterKey(accData.Username)
+          .then(ct => {
+            accData.Username = ct;
+          }));
+      encryptPromises.push(pmengine.encryptSecretWithMasterKey(accData.Password)
+          .then(ct => {
+            accData.Password = ct;
+          }));
+      encryptPromises.push(pmengine.encryptSecretWithMasterKey(accData.AdditionalInfo)
+          .then(ct => {
+            accData.AdditionalInfo = ct;
+          }));
+      Promise.all(encryptPromises)
+        .then(foo => {
+          // Save this new data
+          pmui.saveAccountsFunc([accData]);
+
+          // store it in the local data
+          if (pmui.siteToEdit == -1) {
+            pmui.accountData.push(accData);
+            pmui.accountNames[accData["Site"]] = null;
+          } else {
+            // get and remove old site name
+            var oldName = pmui.accountData[pmui.siteToEdit]["Site"];
+            delete pmui.accountNames[oldName];
+            // add new site name back in
+            pmui.accountNames[accData["Site"]] = null;
+
+            // Replace old data at this Index
+            pmui.accountData[pmui.siteToEdit] = accData;
+
+          }
+          // feedback
+          M.toast({html: "Saved!"})
+          // switch views
+          $("#pm_editaccount_confirmcancel").hide();
+          $("#pm_editaccount").hide();
+          $("#pm_findaccount").show();
+
+        });
+    }
+  },
+
+  cancelSave: function () {
+    // Just some feedback and return to edit view
+    M.toast({html: "Cancelled!"});
+    $("#pm_editaccount_confirmcancel").hide();
+  },
+
 
   fakeVals: function() {
     accDat =  '[{"Index":1,"Site":"google","Username":"NjgsMTUxLDExOCwyNDksNjMsMTM5LDE3Niw1NSwxNzAsNDcsOTEsNDQ=&NjMsMTkwLDEwMSwxNywxODUsMTMwLDE0NiwxMDUsMTc1LDE3MiwyNiwyMDgsMTI0LDIyNCwxNjIsNDQsMTUxLDE1OCwyNTAsMTY0LDcwLDAsMTY0LDk2LDIyOSwxMiwyMTEsMjM5LDE1MywxMDU=","Password":"MjEzLDE0MSwxMiwyMzAsMjEsNjcsMTUxLDczLDEzOCw3OCwyMTIsMjM2&MzMsNTgsMjAyLDEyNCwxMTIsMTQ0LDI1NCwyMjIsMjUxLDc4LDIzMywyNiwyMjAsMTY1LDIzOCwxMTYsNzIsMjUxLDg4LDE0OSwxOTQsMTE3LDExMCwxMTQsMTYyLDIzOSw4OSwyMDYsNTYsMTAx","AdditionalInfo":"MTg4LDMzLDIwNiwxOCwyMywyOCwxMDgsMTExLDkyLDUxLDM5LDMx&MTA3LDE1MiwyMDksMjQsOTQsMjI0LDkyLDQyLDkzLDIwNCwxMzMsNDAsMzcsMTY0LDIxMywxMzAsMjE2LDQ2LDQsMjksMjEsMTg1LDE5LDE4NCwxMjMsMTM3LDEzNg=="},{"Index":2,"Site":"apple","Username":"MjQ1LDg3LDE5MywyMywxNDgsMTI3LDExMSwxNzUsMjUyLDUzLDE3NSw5Mg==&MjM5LDc3LDY0LDE0Niw1MiwxNjcsNjUsNDUsNDIsOTcsMTMzLDEwOSwzMyw4OSwxNywxNjAsMTAsMzcsMTM3LDExNCwyMzUsMjMxLDk2LDEzOCwxNjUsMTc0LDEyOCwzMCwyMDk=","Password":"MzcsMjQxLDI0Myw3OSwzNCwxNiwxNzAsMjE4LDEzOCwxNzYsODcsMjA=&MTczLDEwMSwyNCwzLDEwLDEsMTcsMzQsMjIsMTUzLDI0NCwyMTEsMTQxLDE3NywxMTIsMjQxLDE3OCwyMTMsMTc0LDI0Myw2OCw0NSwxNjYsMjUzLDE2NCwyMTYsMTI3LDExNyw4MA==","AdditionalInfo":"MjUsMjAxLDI0NiwxNjksMjQ4LDExMSw2NSwyNDksODcsMTY0LDI1NCwyMzQ=&MTI4LDkzLDE5NiwxLDExNCwxMDcsMTE1LDE3OCwxODYsMzQsNDIsNTUsMzQsMjEyLDE4NSw5LDE5MSwyMzMsMzUsNDEsMTMwLDg5LDUzLDU1LDEyNCw3Ng=="},{"Index":3,"Site":"la dwp","Username":"MTkxLDc0LDQyLDE3NCwzMywxNzEsOTIsOTMsMjM3LDI5LDE2MCw4NA==&NjUsMjI4LDE2Miw1NCwzMSwyNCwxMSwyNSwxNTAsMjE5LDEzOCwyMzYsMTA5LDIyNCw1OSwyNTUsNzYsNTQsODQsMTU1LDYsMjEsMjA5LDIwMCwyMTIsMTE3LDEyMSwxNTEsMTM2LDQ1","Password":"MTY1LDEyNiwyMDgsMTYxLDEyLDI3LDY0LDE0MSw2MSwxOTksNTEsNTU=&MTYsMzIsMjEzLDE1MSwyMDYsMTM2LDIxMSwyMTksNjksMjA3LDExMiw2Miw5MywyMDQsMTE3LDIwLDIzNSwyMjMsNDksMTA3LDIxNSwyMTMsMjQzLDI0MywyNCwyNTIsMjI4LDYwLDE0NSwyMDg=","AdditionalInfo":"MTU5LDk2LDIxNyw2MSw4MiwxNjIsMjIxLDIyLDIzNCwxNDEsMjUsMzQ=&NjEsMTc3LDE0NCwyMTksMTk2LDI1MywxMjcsMjU0LDQ0LDE4Miw1MSwxMDQsMTQzLDIyMiw1Myw3MSwxNTQsMjUwLDE0MywyMDAsMjQ5LDEsNzgsNzAsMTQxLDE3OCwxMDg="},{"Index":4,"Site":"goatherd","Username":"OTksMjUzLDI0OCwxNzcsMTMyLDE4NiwyNCw4NCwyNDYsMTExLDExMywxMzU=&MTc1LDMxLDI1MywyMTUsMjE0LDU2LDE2NCwzOCwyMzQsMjAxLDE1Myw2LDEzNCwxODAsMjQ5LDIxMiwyLDQ2LDE2NywxODgsMTAyLDEzNiwyMDQsMTU4LDE2MCwxNjAsMTYzLDEwOCwyMDgsMzEsNTUsMTI1","Password":"MTY1LDM5LDIxLDIyMCwyNDQsNTEsMTIxLDE1MSwxLDIxMSwyNTIsMjMz&MjA5LDgzLDE5Miw3OSw2NywyMDMsMjAxLDIwMiwxMzYsMTY2LDIwLDIsMSwyNDEsMzEsNTcsMTgsOCw1MSwyMzAsMTA3LDEzMCw4OSwxNDUsNDksNDcsODQsMjI3LDk2LDEyNiwyMywyMA==","AdditionalInfo":"MjA2LDg2LDE4Myw1NSw2NywxMDYsMTgxLDI0Niw1NSwzNiw1MSwyMjU=&MTIsMjQ3LDM4LDE5LDExOSwzNCw2NCwxOTYsMTg5LDM0LDY1LDExMCw1NiwxMjEsMjI0LDE5NCwyMiwyMTgsMTQ2LDE4MSwxMTcsNCwzMywzMiwxMiwxNzEsNTcsMiwzMg=="}]';
