@@ -10,21 +10,65 @@ var pmengine = {
   masterKey_passcodeEncrypted: null, // The base64 encrypted key from the spreadsheet, needs user passphrase to decrypt
   googleTempActiveUserKey: null, // GTAUK - See https://developers.google.com/apps-script/reference/base/session, used as an encryption key
   masterKeylocalStorageTag: "pmengine_masterkey",
+  getPassphraseCallback: null, // The callback that will provide a Passphrase
 
   whoops: function(msg, err = null) {
     console.log(msg); // To be actually logged to the HTML interface eventually
     if (err) {throw(err);} // Needed to help preserve stack trace for debugging
   },
 
-  generateNewKey: function() {
-    // This generates a brand new master key
+  /*
+  New start set up:
+    - Need a new masterKey, encrypted with a passphrase
+    - Then need to store masterKey with gtauk
+    - as well as have masterKey in memory
+
+  Session start:
+    - Needs gtauk, passphrase encrypted master key, and passphrase callback
+    - recovers masterKey from storage, or asks for passphrase
+      - UI needs to call session start again.. seems safest
+
+  */
+
+  freshStart: function(passphrase, gtauk) {
+    pmengine.googleTempActiveUserKey = gtauk;
+    var rawkey_ct = null;
+    return pmengine.generateNewKey(passphrase)
+      .then(rk_ct => {
+        rawkey_ct = rk_ct;
+        return pmengine.storeMasterKey();
+      }).then(foo => {
+        return rawkey_ct;
+      });
+  },
+
+  sessionStart: function(mk_pe, gtauk, passphraseCallback) {
+    // mk_pe = masterKey, passcode encrypted (ezencrypted)
+    // Google Temp Active User Key - string, but can be any "SSO" token of your choosing
+    // passphraseCallback - function pmengine will call to get passphrase
+    //      - the call back will then call decryptAndStoreMasterKey(passphrase)
+
+    pmengine.masterKey_passcodeEncrypted = mk_pe;
+    pmengine.googleTempActiveUserKey = gtauk;
+    pmengine.getPassphraseCallback = passphraseCallback;
+
+    return pmengine.recoverMasterKeyFromLocalStorage();
+  },
+
+  generateNewKey: function(passphrase) {
+    // This generates a brand new master and also return the key encrypted by
+    // passphrase suitable for storage
+
     return generateSymKey()
       .then(newkey => {
-        this.masterKey = newkey;
-        return true;
-      })
-      .catch(err => {
-        this.whoops("generateSymKey:" +err.name+ " " +err.message);
+        pmengine.masterKey = newkey;
+        return generateAndExportKey(newkey);
+      }).then(rawkey_arr => {
+        return ezSubtleEncrypt(rawkey_arr, passphrase);
+      }).then(rawkey_ct => {
+        return rawkey_ct;
+      }).catch(err => {
+        this.whoops("generateNewKey:" +err.name+ " " +err.message);
       });
   },
 
@@ -83,11 +127,17 @@ var pmengine = {
     }
   },
 
-  decryptAndStoreMasterKey: function() {
+  decryptAndStoreMasterKey: function(passphrase = null) {
     // Decrypts master key using passcode
+
+    if (passphrase == null) {
+      pmengine.getPassphraseCallback();
+      return;
+    }
+
     var key_mat_arr = null;
 
-    passcode = prompt("Please enter your passphrase","");
+    // passcode = prompt("Please enter your passphrase","");
     return ezSubtleDecrypt(this.masterKey_passcodeEncrypted, passcode)
       .then(key_arr => {
         // Turn into real key
@@ -99,7 +149,24 @@ var pmengine = {
       }).then(foo => {
         return true;
       }).catch(err => {
+        // Probably passphrase is wrong
+        pmengine.passphrase = null;
+        pmengine.getPassphraseCallback("Please try again");
         this.whoops("decryptAndStoreMasterKey:" +err.name+ " " +err.message);
+      });
+  },
+
+  changePassphraseOnMasterKey: function(newPassphrase) {
+    // Simply encrypts the existing masterKey with a new passphrase
+    // returns the ciphered key, suitable for storing
+    // Also sets internal variables
+    return generateAndExportKey(this.masterKey)
+      .then(rawkey_arr => {
+        // Now encrypt with GTAUK
+        return ezSubtleEncrypt(rawkey_arr, newPassphrase);
+      }).then(rawkey_ct => {
+        pmengine.masterKey_passcodeEncrypted = rawkey_ct;
+        return rawkey_ct;
       });
   },
 

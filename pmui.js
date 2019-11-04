@@ -8,6 +8,9 @@ var pmui = {
   accountNames: {},
   siteToEdit: 0,
   nextIndex: 0,
+  splashDelay: 1000,
+  splashFrequency: 10, // Interval where splashes are shown
+  splashLocalStorage: "pmui_splashCount",
 
   /*
   The callbacks below are used to get, save, and delete accounts
@@ -18,13 +21,83 @@ var pmui = {
                 Password: ciphertext string password,
                 AdditionalInfo: ciphertext string additional information}
   saveAccounts must accept an array of accountObjects
+    Must also watch for a returned object like:
+      {PMUIMASTERKEY: encipheredMasterKeySuitableForSaving}
   deleteAccount must accept an integer index of account to delete
   */
   getAccountsFunc: null, // callback pmui will use to get account data. f()
   saveAccountsFunc: null, // callback to save accounts. f(accountObjArray)
   deleteAccountFunc: null, // callback to delete an account f(accountIndex)
+  gtauk: null, // Google temp user key (SSO token)
 
-  init: function (getAccountsFunc, saveAccountsFunc, deleteAccountFunc) {
+  later: function (delay) {
+    // Utility delay timer
+    // delay is in milliseconds
+    return new Promise(function(resolve) {
+        setTimeout(resolve, delay);
+    });
+  },
+
+  freshStart: function(getAccountsFunc, saveAccountsFunc, deleteAccountFunc, gtauk) {
+    pmui.getAccountsFunc = getAccountsFunc;
+    pmui.saveAccountsFunc = saveAccountsFunc;
+    pmui.deleteAccountFunc = deleteAccountFunc;
+    pmui.gtauk = gtauk;
+
+
+
+    // Splash page, with no OK button
+    $("#pm_about_ok").off("click");
+    $("#pm_about_ok").click(function () {
+      pmui.freshStart_ok();
+    });
+    $("#pm_about_splash").show();
+
+    pmui.later(pmui.splashDelay)
+      .then(foo => {
+        // Get the password
+        $("#pm_about_ok").removeClass("disabled");
+        $("#pm_about_ok").text("Ok");
+      });
+    // Get a confirmed password
+    // Then go to main page
+  },
+
+  freshStart_ok: function (gtauk) {
+    $("#pm_about_splash").hide();
+    $("#pm_freshstart").show();
+
+    // Start watching that second password
+    $("#pm_freshstart_password2").off("keyup");
+    $("#pm_freshstart_password2").keyup(function (event) {
+      if ($("#pm_freshstart_password2").val() == $("#pm_freshstart_password1").val()) {
+        $("#pm_freshstart_go").text("Go!");
+        $("#pm_freshstart_go").removeClass("disabled");
+      } else {
+        $("#pm_freshstart_go").text("Passphrases do not match");
+        $("#pm_freshstart_go").addClass("disabled");
+      }
+    });
+
+    // Connect the ok button
+    $("#pm_freshstart_go").off("click");
+    $("#pm_freshstart_go").click(function (event) {
+      pmui.freshStart_gotPassphrase();
+    });
+  },
+
+  freshStart_gotPassphrase: function () {
+    var passphrase = $("#pm_freshstart_password2").val();
+    pmengine.freshStart(passphrase, pmui.gtauk)
+      .then(rawkey_ct => {
+        return pmui.saveAccountsFunc([{PMUIMASTERKEY:rawkey_ct}]);
+      }).then(foo => {
+        // Go main
+        pmui.sessionStart(pmui.getAccountsFunc, pmui.saveAccountsFunc, pmui.deleteAccountFunc, pmui.gtauk);
+      });
+  },
+
+  sessionStart: function (getAccountsFunc, saveAccountsFunc, deleteAccountFunc, mk_pe, gtauk) {
     pmui.initButtons();
 
     pmui.getAccountsFunc = getAccountsFunc;
@@ -36,8 +109,11 @@ var pmui = {
     // First unlock the masterKey
     this.accountNames = {};
     indexNumbers = [];
-    pmengine.recoverMasterKeyFromLocalStorage()
-      .then(foo => {
+    pmui.getAccountsFunc()
+      .then(accountsObj => {
+        pmui.accountData = accountsObj;
+        return pmengine.recoverMasterKeyFromLocalStorage();
+      }).then(foo => {
         // set up the search bar
         $("#pm_startup_message").text("Processing accounts");
         $.each(this.accountData, function (index, anAccount) {

@@ -150,6 +150,7 @@ $(document).ready(function(){
 
   pmengine.fakeVals()
   //pmui.fakeVals();
-  pmui.init(provideAccountData, saveAccounts, deleteAccount);
-  
+  //pmui.init(provideAccountData, saveAccounts, deleteAccount);
+  pmui.freshStart("foo");
+
 });
