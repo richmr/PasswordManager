@@ -137,20 +137,67 @@ function provideAccountData() {
   return JSON.parse(accDat);
 }
 
-function saveAccounts(accountObjs) {
-  console.log("saveAccounts called");
+
+
+
+var accounts = JSON.parse(localStorage.getItem("pmtests_accounts"));
+if (accounts == null) {accounts = [];}
+var mk_pe = localStorage.getItem("pmtests_mk_pe");
+var gtauk = "mxlplx";
+
+function saveAccount(accountObjs) {
+  console.log("I got "+accountObjs.length+" new accounts");
+  return new Promise(function(resolve, reject) {
+    $.each(accountObjs, function (index, account) {
+      // check for master key
+      if (account["PMUIMASTERKEY"]) {
+        mk_pe = account["PMUIMASTERKEY"];
+        localStorage.setItem("pmtests_mk_pe", mk_pe);
+      } else {
+        // Is this a known site
+        var siteToEdit = accounts.findIndex(({Index}) => Index == account["Index"]);
+        console.log("I got index "+siteToEdit+" for Index "+account["Index"]);
+        if (siteToEdit == -1) {
+          accounts.push(account);
+        } else {
+          accounts[siteToEdit] = account;
+        }
+        localStorage.setItem("pmtests_accounts", JSON.stringify(accounts));
+      }
+    });
+    resolve();
+  });
 }
 
-function deleteAccount(accountID) {
-  console.log("Supposed to delete " + accountID);
+function getAccounts() {
+  return new Promise(function(resolve, reject) {
+    if (accounts == null) {
+      resolve([]);
+    } else {
+      resolve(accounts);
+    }
+  });
+
+}
+
+function deleteAccount(accountIndex) {
+  return new Promise(function(resolve, reject) {
+    var siteToEdit = accounts.findIndex(({Index}) => Index === accountIndex);
+    if (siteToEdit != -1) {
+      accounts.splice(siteToEdit, 1);
+      localStorage.setItem("pmtests_accounts", JSON.stringify(accounts));
+    }
+    resolve();
+  });
 }
 
 $(document).ready(function(){
   M.AutoInit();
 
-  pmengine.fakeVals()
-  //pmui.fakeVals();
-  //pmui.init(provideAccountData, saveAccounts, deleteAccount);
-  pmui.freshStart("foo");
+  if (mk_pe == null) {
+    pmui.freshStart(getAccounts, saveAccount, deleteAccount, gtauk);
+  } else {
+    pmui.sessionStart(getAccounts, saveAccount, deleteAccount, mk_pe, gtauk);
+  }
 
 });

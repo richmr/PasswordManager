@@ -29,6 +29,7 @@ var pmui = {
   saveAccountsFunc: null, // callback to save accounts. f(accountObjArray)
   deleteAccountFunc: null, // callback to delete an account f(accountIndex)
   gtauk: null, // Google temp user key (SSO token)
+  mk_pe: null, // encrypted master key from storage
 
   later: function (delay) {
     // Utility delay timer
@@ -43,9 +44,6 @@ var pmui = {
     pmui.saveAccountsFunc = saveAccountsFunc;
     pmui.deleteAccountFunc = deleteAccountFunc;
     pmui.gtauk = gtauk;
-
-
-
     // Splash page, with no OK button
     $("#pm_about_ok").off("click");
     $("#pm_about_ok").click(function () {
@@ -88,13 +86,41 @@ var pmui = {
 
   freshStart_gotPassphrase: function () {
     var passphrase = $("#pm_freshstart_password2").val();
+    var rawkey_ct = null;
     pmengine.freshStart(passphrase, pmui.gtauk)
       .then(rawkey_ct => {
         return pmui.saveAccountsFunc([{PMUIMASTERKEY:rawkey_ct}]);
       }).then(foo => {
         // Go main
-        pmui.sessionStart(pmui.getAccountsFunc, pmui.saveAccountsFunc, pmui.deleteAccountFunc, pmui.gtauk);
+        $("#pm_startup").show();
+        $("#pm_freshstart").hide();
+        pmui.sessionStart(pmui.getAccountsFunc, pmui.saveAccountsFunc, pmui.deleteAccountFunc, rawkey_ct, pmui.gtauk);
       });
+
+  },
+
+  passphraseUI: function (errMsg = null) {
+    // Should generally be called from pm_startup
+    if (errMsg) {
+      $("#pm_getpassphrase_msg").addClass("red-text");
+      $("#pm_getpassphrase_msg").text(errMsg);
+    } else {
+      $("#pm_getpassphrase_msg").removeClass("red-text");
+      $("#pm_getpassphrase_msg").text("Please enter your passphrase");
+    }
+    $("#pm_startup").hide();
+    $("#pm_getpassphrase").show();
+  },
+
+  gotPassphrase: function () {
+    // Per pmengine, now call decryptAndStoreMasterKey
+    // Hide get passphrase and show startup
+    $("#pm_startup").show();
+    $("#pm_getpassphrase").hide();
+
+    // Call pmui
+    var passphrase = $("#pm_getpassphrase_entry").val();
+    pmui.uiSessionStart(passphrase);
   },
 
   sessionStart: function (getAccountsFunc, saveAccountsFunc, deleteAccountFunc, mk_pe, gtauk) {
@@ -103,17 +129,23 @@ var pmui = {
     pmui.getAccountsFunc = getAccountsFunc;
     pmui.saveAccountsFunc = saveAccountsFunc;
     pmui.deleteAccountFunc = deleteAccountFunc;
+    pmui.gtauk = gtauk;
+    pmui.mk_pe = mk_pe;
 
-    pmui.accountData = pmui.getAccountsFunc();
-
-    // First unlock the masterKey
-    this.accountNames = {};
-    indexNumbers = [];
     pmui.getAccountsFunc()
       .then(accountsObj => {
         pmui.accountData = accountsObj;
-        return pmengine.recoverMasterKeyFromLocalStorage();
-      }).then(foo => {
+        pmui.uiSessionStart();
+      });
+  },
+
+  uiSessionStart: function (passphrase = null) {
+    // First unlock the masterKey
+    this.accountNames = {};
+    indexNumbers = [];
+
+    pmengine.sessionStart(pmui.mk_pe, pmui.gtauk, pmui.passphraseUI, passphrase)
+      .then(foo => {
         // set up the search bar
         $("#pm_startup_message").text("Processing accounts");
         $.each(this.accountData, function (index, anAccount) {
@@ -128,7 +160,13 @@ var pmui = {
           onAutocomplete:pmui.accountAutocompleted
         });
         // Set nextIndex
-        pmui.nextIndex = Math.max(...indexNumbers) + 1;
+        // Watch out for empty list (no accounts)
+        // in javascript the max of empty is -infinity...?
+        if (indexNumbers.length) {
+          pmui.nextIndex = Math.max(...indexNumbers) + 1;
+        } else {// Catch empty set issue
+          pmui.nextIndex = 1;
+        }
 
       }).then(foo => {
         // initial value for the "Find" button
@@ -142,6 +180,9 @@ var pmui = {
   },
 
   initButtons: function () {
+    // Passphrase button
+    $("#pm_getpassphrase_go").click(pmui.gotPassphrase);
+
     // Init find button
     $("#pm_findaccount_openbtn").click(pmui.editAccount);
 
@@ -300,8 +341,8 @@ var pmui = {
     // Are we deleting or saving?
     if ($("#pm_editaccount_confirm_btn").text() == "Delete") {
       // We are deleting
-      // Remove from the database
-      pmui.deleteAccountFunc(pmui.siteToEdit);
+      // Remove from the database (send the Index)
+      pmui.deleteAccountFunc(pmui.accountData[pmui.siteToEdit]["Index"]);
 
       // Remove from account data
       // From name list first

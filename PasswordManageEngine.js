@@ -42,7 +42,7 @@ var pmengine = {
       });
   },
 
-  sessionStart: function(mk_pe, gtauk, passphraseCallback) {
+  sessionStart: function(mk_pe, gtauk, passphraseCallback, passphrase = null) {
     // mk_pe = masterKey, passcode encrypted (ezencrypted)
     // Google Temp Active User Key - string, but can be any "SSO" token of your choosing
     // passphraseCallback - function pmengine will call to get passphrase
@@ -52,7 +52,7 @@ var pmengine = {
     pmengine.googleTempActiveUserKey = gtauk;
     pmengine.getPassphraseCallback = passphraseCallback;
 
-    return pmengine.recoverMasterKeyFromLocalStorage();
+    return pmengine.recoverMasterKeyFromLocalStorage(passphrase);
   },
 
   generateNewKey: function(passphrase) {
@@ -96,7 +96,7 @@ var pmengine = {
       })
   },
 
-  recoverMasterKeyFromLocalStorage: function() {
+  recoverMasterKeyFromLocalStorage: function(passphrase) {
     // Checks local storage for a stored masterKey
     // attempts to decrypt it with googleTempActiveUserKey
     // if fail, then begins process to decrypt masterKey_passcodeEncrypted
@@ -117,13 +117,13 @@ var pmengine = {
           return true;
         }).catch(err => {
           this.whoops("recoverMasterKeyFromLocalStorage("+state+ "):" +err.name+ " " +err.message);
-          return this.decryptAndStoreMasterKey();
+          return this.decryptAndStoreMasterKey(passphrase);
         });
     } catch(err) {
       // Per documentation SecurityError can happen when user denies local storage
       // This is the same as decryption failing
       this.whoops("recoverMasterKeyFromLocalStorage.localstorage:" +err.name+ " " +err.message)
-      return this.decryptAndStoreMasterKey();
+      return this.decryptAndStoreMasterKey(passphrase);
     }
   },
 
@@ -151,7 +151,7 @@ var pmengine = {
       }).catch(err => {
         // Probably passphrase is wrong
         pmengine.passphrase = null;
-        pmengine.getPassphraseCallback("Please try again");
+        pmengine.getPassphraseCallback("Passphrase did not work. Please try again");
         this.whoops("decryptAndStoreMasterKey:" +err.name+ " " +err.message);
       });
   },
