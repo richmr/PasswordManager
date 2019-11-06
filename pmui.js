@@ -4,7 +4,7 @@ Mike Rich, 2019
 */
 
 var pmui = {
-  accountData: null,  // The accountData object, array of JSON objects
+  accountData: [],  // The accountData object, array of JSON objects
   accountNames: {},
   siteToEdit: 0,
   nextIndex: 0,
@@ -26,6 +26,8 @@ var pmui = {
   deleteAccount must accept an integer index of account to delete
   */
   getAccountsFunc: null, // callback pmui will use to get account data. f()
+                        // to prevent object reference errors, this should return a
+                        // JSON stringify version of the accounts object!
   saveAccountsFunc: null, // callback to save accounts. f(accountObjArray)
   deleteAccountFunc: null, // callback to delete an account f(accountIndex)
   gtauk: null, // Google temp user key (SSO token)
@@ -101,6 +103,12 @@ var pmui = {
 
   passphraseUI: function (errMsg = null) {
     // Should generally be called from pm_startup
+    //$("#pm_findaccount").hide();
+    console.log("passphraseUI called");
+    $("#pm_getpassphrase").modal("open");
+    //$("#pm_startup").hide();
+
+
     if (errMsg) {
       $("#pm_getpassphrase_msg").addClass("red-text");
       $("#pm_getpassphrase_msg").text(errMsg);
@@ -108,15 +116,14 @@ var pmui = {
       $("#pm_getpassphrase_msg").removeClass("red-text");
       $("#pm_getpassphrase_msg").text("Please enter your passphrase");
     }
-    $("#pm_startup").hide();
-    $("#pm_getpassphrase").show();
+
   },
 
   gotPassphrase: function () {
     // Per pmengine, now call decryptAndStoreMasterKey
     // Hide get passphrase and show startup
-    $("#pm_startup").show();
-    $("#pm_getpassphrase").hide();
+    //$("#pm_startup").show();
+    $("#pm_getpassphrase").modal("close");
 
     // Call pmui
     var passphrase = $("#pm_getpassphrase_entry").val();
@@ -133,8 +140,8 @@ var pmui = {
     pmui.mk_pe = mk_pe;
 
     pmui.getAccountsFunc()
-      .then(accountsObj => {
-        pmui.accountData = accountsObj;
+      .then(accountsObjStr => {
+        pmui.accountData = JSON.parse(accountsObjStr);
         pmui.uiSessionStart();
       });
   },
@@ -150,6 +157,7 @@ var pmui = {
         $("#pm_startup_message").text("Processing accounts");
         $.each(this.accountData, function (index, anAccount) {
           pmui.accountNames[anAccount["Site"]] = null; // Per MaterializeCSS needs
+          //console.log("uiSessionStart, indexNumbers.push");
           indexNumbers.push(anAccount["Index"]);
           // Update the status bar
           percDone = ((index+1)/pmui.accountData.length)*100;
@@ -168,13 +176,16 @@ var pmui = {
           pmui.nextIndex = 1;
         }
 
+
       }).then(foo => {
         // initial value for the "Find" button
         $("#pm_findaccount_openbtn").text("Go");
-
         // switch views
         $("#pm_startup").hide();
+        // Need to account for possibility of the passphrase ui showing here
         $("#pm_findaccount").show();
+
+
         $("#pm_findaccount_autocomplete").focus();
       });
   },
@@ -216,7 +227,7 @@ var pmui = {
     var nameOfSite = $("#pm_findaccount_autocomplete").val();
     $("#pm_editaccount_password_copy").removeClass("disabled");
 
-    console.log(nameOfSite);
+    //console.log(nameOfSite);
     pmui.siteToEdit = pmui.accountData.findIndex(({ Site }) => Site === nameOfSite);
 
     if (pmui.siteToEdit == -1) {
@@ -244,6 +255,7 @@ var pmui = {
 
       // Decrypt all the things
       decryptPromises = [];
+      //console.log("editAccount, decryptPromises pushes");
       decryptPromises.push(pmengine.decryptSecretWithMasterKey(accData.Username, true)
           .then(pt => {
             $("#pm_editaccount_username").val(pt);
@@ -282,7 +294,7 @@ var pmui = {
   },
 
   togglePasswordView: function () {
-    console.log("pw toggled");
+    //console.log("pw toggled");
     if ($("#pm_editaccount_password_view").is(':checked')) {
       document.getElementById("pm_editaccount_password").type = "text";
     } else {
@@ -334,6 +346,8 @@ var pmui = {
     // simply hide the edit div and show the search
     // switch views
     $("#pm_editaccount").hide();
+    console.log("doneEdit findaccount show");
+
     $("#pm_findaccount").show();
   },
 
@@ -355,6 +369,8 @@ var pmui = {
       // switch views
       $("#pm_editaccount_confirmcancel").hide();
       $("#pm_editaccount").hide();
+      console.log("confirmSaveChanges findaccount show");
+
       $("#pm_findaccount").show();
 
     } else {
@@ -377,6 +393,7 @@ var pmui = {
 
       // Encrypt all the things
       encryptPromises = [];
+      //console.log("confirmSave, encryptPromises pushes");
       encryptPromises.push(pmengine.encryptSecretWithMasterKey(accData.Username)
           .then(ct => {
             accData.Username = ct;
@@ -392,11 +409,22 @@ var pmui = {
       Promise.all(encryptPromises)
         .then(foo => {
           // Save this new data
-          pmui.saveAccountsFunc([accData]);
+          //console.log("confirmSave, pre saveAccountsFunc length = "+pmui.accountData.length);
+          pmui.saveAccountsFunc([accData])
+            .then(foo => {
+              //console.log("confirmSave, post saveAccountsFunc length = "+pmui.accountData.length);
+          });
+
+          //console.log("confirmSave, pre if accountData length = "+pmui.accountData.length);
+
 
           // store it in the local data
           if (pmui.siteToEdit == -1) {
+            //console.log("confirmSave, accountData push (data: "+JSON.stringify(accData)+")");
+            //console.log("confirmSave, prepush accountData length = "+pmui.accountData.length);
             pmui.accountData.push(accData);
+            //console.log("confirmSave, post accountData length = "+pmui.accountData.length);
+
             pmui.accountNames[accData["Site"]] = null;
           } else {
             // get and remove old site name
@@ -414,6 +442,8 @@ var pmui = {
           // switch views
           $("#pm_editaccount_confirmcancel").hide();
           $("#pm_editaccount").hide();
+          console.log("confirmSaveChanges2 findaccount show");
+
           $("#pm_findaccount").show();
 
         });

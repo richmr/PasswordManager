@@ -144,6 +144,7 @@ var accounts = JSON.parse(localStorage.getItem("pmtests_accounts"));
 if (accounts == null) {accounts = [];}
 var mk_pe = localStorage.getItem("pmtests_mk_pe");
 var gtauk = "mxlplx";
+console.log("values initialized?");
 
 function saveAccount(accountObjs) {
   console.log("I got "+accountObjs.length+" new accounts");
@@ -155,9 +156,13 @@ function saveAccount(accountObjs) {
         localStorage.setItem("pmtests_mk_pe", mk_pe);
       } else {
         // Is this a known site
-        var siteToEdit = accounts.findIndex(({Index}) => Index == account["Index"]);
+        //var siteToEdit = accounts.findIndex(({Index}) => Index == account["Index"]);
+        var siteToEdit = accounts.findIndex( function (element) {
+          return element.Index == account["Index"];
+        });
         console.log("I got index "+siteToEdit+" for Index "+account["Index"]);
         if (siteToEdit == -1) {
+          console.log("saveAccount: push");
           accounts.push(account);
         } else {
           accounts[siteToEdit] = account;
@@ -165,16 +170,16 @@ function saveAccount(accountObjs) {
         localStorage.setItem("pmtests_accounts", JSON.stringify(accounts));
       }
     });
-    resolve();
+    resolve(accountObjs);
   });
 }
 
 function getAccounts() {
   return new Promise(function(resolve, reject) {
     if (accounts == null) {
-      resolve([]);
+      resolve(JSON.stringify([]));
     } else {
-      resolve(accounts);
+      resolve(JSON.stringify(accounts));
     }
   });
 
@@ -187,12 +192,14 @@ function deleteAccount(accountIndex) {
       accounts.splice(siteToEdit, 1);
       localStorage.setItem("pmtests_accounts", JSON.stringify(accounts));
     }
-    resolve();
+    resolve(accountIndex);
   });
 }
 
 $(document).ready(function(){
   M.AutoInit();
+  var pwmodal = document.querySelector("#pm_getpassphrase");
+  M.Modal.init(pwmodal, {dismissible:false});
 
   if (mk_pe == null) {
     pmui.freshStart(getAccounts, saveAccount, deleteAccount, gtauk);

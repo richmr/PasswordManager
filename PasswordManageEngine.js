@@ -138,7 +138,7 @@ var pmengine = {
     var key_mat_arr = null;
 
     // passcode = prompt("Please enter your passphrase","");
-    return ezSubtleDecrypt(this.masterKey_passcodeEncrypted, passcode)
+    return ezSubtleDecrypt(this.masterKey_passcodeEncrypted, passphrase)
       .then(key_arr => {
         // Turn into real key
         return importRawKey(key_arr);
