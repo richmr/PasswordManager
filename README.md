@@ -11,7 +11,7 @@ Also, to mitigate the risk of lost passwords, I will be providing a code set you
 Finally, I will be fully describing the cryptography I used and how.  You will be able to decrypt your passwords if you follow the recipe.
 
 ## Limitations
-- Google does not allow App Scripts to run on mobile devices, therefore this will not work on your phone or tablet.  It only works from desktop or laptop computers.  This made me sad but I already had the code working before I realized this limitation.
+- **Google does not allow App Scripts to run on mobile devices**, therefore this will not work on your phone or tablet.  It only works from desktop or laptop computers.  This made me sad but I already had the code working before I realized this limitation.
 - I have only tested this on Chrome.  In theory, it will work on Safari, Firefox, and Opera.  It will not work on Microsoft browser products because they do not support the cryptography functions I used.
 - This does not auto-magically sync with sites, or reset passwords, or any number of the fancy features you can pay for with other password managers.  It just keeps your personal passwords secure and accessible from any computer you can log in to with your Google account.
 - I cannot help you recover your passwords if you forget your master passphrase.
@@ -47,8 +47,19 @@ My add-on code does not collect your information in any way, shape, or form.  Ho
 - For the password manager, the 256 bit key used to encrypt the data is generated randomly.  It is then encrypted using key material derived from the master passphrase you set on initial start up.
 - When you open the password manager, it will ask you for your master passphrase.  It will use the passphrase to decrypt the master key, which is then used to decrypt everything else.  
 - If you change the master passphrase, it KEEPS the same master key, it just re-encrypts it using the new master passphrase.  Currently there is no capability to change the master key.
-- At no point is your master passphrase ever stored on the Google Sheet, nor is the decrypted master key ever stored or sent anywhere; it is only kept in the browser's memory.
-- To limit the number of times you have to enter your master passphrase, I store an encrypted copy of the master key in the local storage of your browser.  This copy is encrypted using key material derived from your [Temporary Active User Key](https://developers.google.com/apps-script/reference/base/session) provided by Google.
+- At no point is your master passphrase ever stored on the Google Sheet, nor is the **decrypted** master key ever stored or sent anywhere; it is only kept in the browser's memory.
+- To limit the number of times you have to enter your master passphrase, I store an **encrypted** copy of the master key in the local storage of your browser.  This copy is encrypted using key material derived from your [Temporary Active User Key](https://developers.google.com/apps-script/reference/base/session) provided by Google.
   - This is a string set by Google that is: unique per user per script, and only supposed to last for 30 days.
   - They look like this: ADw9Sr7nHOb0PwdCVT2QeJzm7sdfJzOES4hKrF+YqQ7IyI/NR8DqZKFCF5g/04PAQa99S+6Ckjvf
-  - Every time you open the password manager I retrieve your Google-assigned unique key and attempt to use it to decrypt the master key stored on your computer.  If successful, you can access your stuff.  If not, you will be prompted for your master passphrase. 
+  - Every time you open the password manager I retrieve your Google-assigned unique key and attempt to use it to decrypt the master key stored on your computer.  If successful, you can access your stuff.  If not, you will be prompted for your master passphrase.
+- To be clear, this is what has to happen for someone to access your passwords without your knowledge:
+  - They must have access to your Google Drive, or the Google Sheet itself
+  - They must know, or be able to guess, your master passphrase
+  - If they can access a computer you use, they can attempt to pull the encrypted master key from your browser's local storage
+  - They will then need your Google Temporary Active User Key, which is supposed to be unique per user and per script.  This means they must be logged in as you on Google and run this script.  
+  - If someone is able to log in as you on Google, you probably have other problems.   I highly recommend enabling additional authentication factors on your Google account.
+
+## Feeling Generous?
+I wrote this for my own use and I'm happy to share.  However, if you are getting good use out of it, and want to be nice:
+
+![richmr2174@gmail.com](mrvenmo.png)   
