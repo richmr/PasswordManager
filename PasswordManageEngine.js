@@ -10,6 +10,7 @@ var pmengine = {
   masterKey_passcodeEncrypted: null, // The base64 encrypted key from the spreadsheet, needs user passphrase to decrypt
   googleTempActiveUserKey: null, // GTAUK - See https://developers.google.com/apps-script/reference/base/session, used as an encryption key
   masterKeylocalStorageTag: "pmengine_masterkey",
+  masterKeyExpiration: 5*0.000011, // Number of days until the masterKey cookie is supposed to expire
   getPassphraseCallback: null, // The callback that will provide a Passphrase
 
   whoops: function(msg, err = null) {
@@ -85,7 +86,10 @@ var pmengine = {
       }).then(rawkey_str => {
         // Try to store it
         try {
-          localStorage.setItem(this.masterKeylocalStorageTag, rawkey_str);
+          // Store as a cookie with a 7 day expiration, since Google does not
+          // seem to be rotating the GTAUK as advertised
+          pmengine.setCookie(this.masterKeylocalStorageTag, rawkey_str, this.masterKeyExpiration);
+          //localStorage.setItem(this.masterKeylocalStorageTag, rawkey_str);
           return true;
         } catch(err) {
           // Probably security restricted.  No big deal, just log it
@@ -102,7 +106,12 @@ var pmengine = {
     // if fail, then begins process to decrypt masterKey_passcodeEncrypted
     var state = null;
     try {
-      var masterKeyFromLocalStorage = localStorage.getItem(this.masterKeylocalStorageTag);
+      // Using cookies now.
+      // The browser should "expire" the cookie by itself, so if it is here then
+      // it will be returned, otherwise getCookie returns a "false" which will make
+      // the next step error out by default and move to correct logic
+      var masterKeyFromLocalStorage = pmengine.getCookie(this.masterKeylocalStorageTag);
+      //var masterKeyFromLocalStorage = localStorage.getItem(this.masterKeylocalStorageTag);
       // attempt decrypt using GTAUK
       state = "ezSubtleDecrypt";
       return ezSubtleDecrypt(masterKeyFromLocalStorage, this.googleTempActiveUserKey)
@@ -208,11 +217,12 @@ var pmengine = {
   },
 
   // Utility functions (really don't belong here, but want to limit dependencies)
-  // Code taken from: https://www.w3schools.com/js/js_cookies.asp
+  // Code modified from: https://www.w3schools.com/js/js_cookies.asp
   setCookie: function (cname, cvalue, exdays) {
-    var d = new Date();
-    d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
-    var expires = "expires="+d.toUTCString();
+    //var d = new Date();
+    // Use max_age as it provides more flexibility for testing
+    var max_age_s = Math.ceil(exdays * 24 * 60 * 60);
+    var expires = "Max-Age="+max_age_s;
     document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
   },
 
