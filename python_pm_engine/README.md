@@ -9,6 +9,7 @@ This is a Python implementation of the JavaScript Password Manager Engine, desig
 - **PBKDF2 Key Derivation**: Password-based key derivation with the same parameters
 - **CLI Interface**: Command-line tools using Typer for easy testing and automation
 - **Compatible Format**: Produces and consumes the same encrypted data format as the JS version
+- **CSV Import**: Read and decrypt passwords from exported CSV files
 
 ## Installation
 
@@ -24,6 +25,78 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
+### CSV Functionality
+
+The `read-csv-passwords` command allows you to decrypt passwords from an exported CSV file from your PasswordManager Google Sheet.
+
+#### How to Export Your Data
+
+1. Open your PasswordManager Google Sheet
+2. Navigate to the "MyPasswordData" tab
+3. Go to File → Download → Comma-separated values (.csv)
+4. Save the CSV file to the same directory as this code
+
+#### CSV File Format
+
+The CSV should have the following structure:
+- **Row 1**: `[Note/ignored, Encrypted master key]` - Contains the encrypted master key
+- **Row 2**: Headers (column names like Index, Site, Username, Password, Additional Info)
+- **Row 3+**: Encrypted data rows
+
+#### Using the CSV Command
+
+When you run `read-csv-passwords`, the tool will:
+1. Load and parse the CSV file
+2. Prompt you for your master key passphrase
+3. Decrypt the master key using your passphrase
+4. Display a list of available password entries
+5. Allow you to:
+   - View detailed information for any entry
+   - Search entries by site name
+   - Decrypt and display usernames, passwords, and additional info
+
+#### Interactive Features
+
+- **Entry Selection**: Enter a number to view detailed information for that entry
+- **Search**: Use `search <term>` to filter entries by site name
+- **Navigation**: Press Enter to return to the full list, or 'q' to quit
+- **Secure Display**: Only encrypted fields (Username, Password, Additional Info) are decrypted; Index and Site remain as plain text
+
+#### Example Session
+
+```bash
+$ python -m python_pm_engine.main read-csv-passwords MyPasswordData.csv
+📁 CSV file loaded: MyPasswordData.csv
+📊 Found 15 entries with 5 columns
+🔑 Headers: Index, Site, Username, Password, Additional Info
+
+Enter master key passphrase: your_passphrase
+🔑 Decrypting master key...
+✅ Master key decrypted successfully!
+
+📋 Available entries:
+   1. Google
+   2. GitHub
+   3. Amazon
+   4. Bank of America
+   ...
+
+Options:
+  - Enter a number (1-15) to view entry details
+  - Enter 'search <term>' to filter entries by site name
+  - Enter 'quit' or 'exit' to exit
+
+Enter your choice: 1
+📖 Entry 1 details:
+==================================================
+Index: 1
+Site: Google
+Username: your_email@gmail.com
+Password: your_decrypted_password
+Additional Info: 2FA enabled
+==================================================
+```
 
 ### CLI Commands
 
@@ -53,6 +126,13 @@ python -m python_pm_engine.main encrypt-secret "your_secret_text" --passphrase "
 ```bash
 python -m python_pm_engine.main decrypt-secret "iv_base64&ciphertext_base64" --passphrase "your_passphrase"
 ```
+
+#### Read CSV Passwords
+```bash
+python -m python_pm_engine.main read-csv-passwords "MyPasswordData.csv"
+```
+
+
 
 ### Python API
 
